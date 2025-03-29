@@ -11,7 +11,9 @@ const Header = () => {
             <Certificate className="w-8 h-8 text-emerald-400" />
             <h1 className="text-2xl font-bold text-white">Akashi</h1>
           </div>
-          <WalletConnect />
+          <div className="relative z-20">
+            <WalletConnect />
+          </div>
         </div>
       </div>
     </header>
