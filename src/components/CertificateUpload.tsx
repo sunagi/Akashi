@@ -7,7 +7,6 @@ const CertificateUpload = () => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [certificateTitle, setCertificateTitle] = useState('');
-  const [certificateDescription, setCertificateDescription] = useState('');
   const [recipientAddress, setRecipientAddress] = useState('');
   const { currentAccount, signAndExecuteTransactionBlock } = useWalletKit();
 
@@ -48,17 +47,15 @@ const CertificateUpload = () => {
     return `${aggregatorUrl}/v1/blobs/${blobId}`;
   };
 
-  const mintCertificateNFT = async (file: File, title: string, description: string, walrusCid: string, recipient: string) => {
+  const mintCertificateNFT = async (title: string, walrusCid: string, recipient: string) => {
     if (!currentAccount) throw new Error('Wallet not connected');
-    // モジュールパスが正しいことを確認
-    const PACKAGE_ID = '0x57ef8f2cfa12b3f5fcff0c2ac99cd40de3d81038b0758f13f4dde3804e7d7333';
+    const PACKAGE_ID = '0x5f0eb7ec940daaa1096dc1cb18b507c8e01d5bfe9951f57a04178e8fce8b1d01';
 
     const tx = new TransactionBlock();
     tx.moveCall({
       target: `${PACKAGE_ID}::certificate_nft::mint_certificate`,
       arguments: [
         tx.pure(title),
-        tx.pure(description),
         tx.pure(walrusCid),
         tx.pure(recipient)
       ]
@@ -72,20 +69,16 @@ const CertificateUpload = () => {
     if (!selectedFile) return;
     try {
       const walrusCid = await uploadToWalrus(selectedFile);
-      
-      // すべての引数を正しく渡す
+
       await mintCertificateNFT(
-        selectedFile, 
-        certificateTitle, 
-        certificateDescription, 
-        walrusCid, 
+        certificateTitle,
+        walrusCid,
         recipientAddress
       );
-      
+
       alert('Certificate successfully minted as NFT!');
       setSelectedFile(null);
       setCertificateTitle('');
-      setCertificateDescription('');
       setRecipientAddress('');
     } catch (error) {
       console.error('Error details:', error);
@@ -103,7 +96,12 @@ const CertificateUpload = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setSelectedFile(file);
+    if (file) {
+      setSelectedFile(file);
+      if (certificateTitle.trim() === '') {
+        setCertificateTitle(file.name.replace(/\.[^/.]+$/, ''));
+      }
+    }
   };
 
   return (
@@ -140,8 +138,8 @@ const CertificateUpload = () => {
       {selectedFile && (
         <div className="mt-4">
           <input
-            type="id"
-            placeholder="id"
+            type="text"
+            placeholder="Certificate Title"
             className="w-full p-2 rounded bg-white/10 text-white placeholder-white/50"
             value={certificateTitle}
             onChange={(e) => setCertificateTitle(e.target.value)}
@@ -150,20 +148,9 @@ const CertificateUpload = () => {
       )}
       {selectedFile && (
         <div className="mt-2">
-          <textarea
-            placeholder="Certificate Name"
-            className="w-full p-2 rounded bg-white/10 text-white placeholder-white/50"
-            value={certificateDescription}
-            onChange={(e) => setCertificateDescription(e.target.value)}
-            rows={1}
-          />
-        </div>
-      )}
-      {selectedFile && (
-        <div className="mt-2">
           <input
             type="text"
-            placeholder="Approver's address"
+            placeholder="Recipient Address"
             className="w-full p-2 rounded bg-white/10 text-white placeholder-white/50"
             value={recipientAddress}
             onChange={(e) => setRecipientAddress(e.target.value)}
@@ -174,7 +161,7 @@ const CertificateUpload = () => {
         <button
           className={`py-2 px-4 rounded ${
             selectedFile &&
-            certificateDescription.trim() !== '' &&
+            certificateTitle.trim() !== '' &&
             recipientAddress.trim() !== ''
               ? 'bg-emerald-500 text-white'
               : 'bg-gray-400 text-white cursor-not-allowed'
@@ -182,7 +169,7 @@ const CertificateUpload = () => {
           onClick={handleFileUpload}
           disabled={
             !selectedFile ||
-            certificateDescription.trim() === '' ||
+            certificateTitle.trim() === '' ||
             recipientAddress.trim() === ''
           }
         >

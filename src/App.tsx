@@ -1,11 +1,26 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Upload, History } from 'lucide-react';
 import Header from './components/Header';
 import CertificateUpload from './components/CertificateUpload';
 import ActivityHistory from './components/ActivityHistory';
+import ApproveHistory from './components/ApproveHistory';
 import { WalletKitProvider } from '@mysten/wallet-kit';
 
 function App() {
+  const [approvableNfts, setApprovableNfts] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Replace with actual logic to fetch NFTs and check approval eligibility
+    const fetchApprovableNfts = async () => {
+      // Dummy logic (replace with actual API or wallet logic)
+      const nfts = await getMyNfts(); // You should implement getMyNfts
+      const eligible = nfts.filter(nft => nft.canApprove);
+      setApprovableNfts(eligible);
+    };
+
+    fetchApprovableNfts();
+  }, []);
+
   return (
     <WalletKitProvider>
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
@@ -33,6 +48,8 @@ function App() {
               <ActivityHistory />
             </section>
           </div>
+
+          <ApproveHistory approvableNfts={approvableNfts} />
         </main>
       </div>
     </WalletKitProvider>

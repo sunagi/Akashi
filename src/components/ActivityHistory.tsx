@@ -3,7 +3,7 @@ import { CheckCircle } from 'lucide-react';
 import { SuiClient } from '@mysten/sui.js/client';
 import { useWalletKit } from '@mysten/wallet-kit';
 
-const PACKAGE_ID = '0x57ef8f2cfa12b3f5fcff0c2ac99cd40de3d81038b0758f13f4dde3804e7d7333';
+const PACKAGE_ID = '0x5f0eb7ec940daaa1096dc1cb18b507c8e01d5bfe9951f57a04178e8fce8b1d01';
 const suiClient = new SuiClient({ url: 'https://fullnode.testnet.sui.io' });
 
 export type Activity = {
@@ -16,7 +16,7 @@ export type Activity = {
   approved?: boolean;
 };
 
-const ActivityHistory: React.FC<{ mode?: 'sender' | 'approver' }> = ({ mode = 'sender' }) => {
+const ActivityHistory: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
   const { currentAccount } = useWalletKit();
@@ -32,93 +32,70 @@ const ActivityHistory: React.FC<{ mode?: 'sender' | 'approver' }> = ({ mode = 's
           return;
         }
 
-        if (mode === 'approver') {
-          const { data: owned } = await suiClient.getOwnedObjects({
-            owner: walletAddress,
-            options: { showContent: true },
-          });
-
-          const ownedNfts = owned
-            .filter(obj => {
-              const typeStr = (obj.data?.content as any)?.type || '';
-              return typeStr.startsWith(`${PACKAGE_ID}::certificate_nft::CertificateNFT`);
-            })
-            .map((obj, index) => {
-              const fields = (obj.data?.content as any)?.fields;
-              return {
-                id: index,
-                type: fields?.name || fields?.description || 'Certificate',
-                timestamp: new Date().toLocaleString(), // No timestamp available
-                link: fields?.walrus_cid,
-                transactionId: obj.data?.objectId,
-                sender: walletAddress,
-                approved: fields?.approved,
-              };
-            });
-
-          setActivities(ownedNfts);
-        } else {
-          const txs = await suiClient.queryTransactionBlocks({
-            filter: {
-              MoveFunction: {
-                package: PACKAGE_ID,
-                module: 'certificate_nft',
-                function: 'mint_certificate',
-              },
+        const txs = await suiClient.queryTransactionBlocks({
+          filter: {
+            MoveFunction: {
+              package: PACKAGE_ID,
+              module: 'certificate_nft',
+              function: 'mint_certificate',
             },
-            options: {
-              showInput: true,
-              showEffects: true,
-              showEvents: true,
-              showObjectChanges: true,
-              showRawInput: true,
-            },
-            limit: 50,
-          });
+          },
+          options: {
+            showInput: true,
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true,
+            showRawInput: true,
+          },
+          limit: 50,
+        });
 
-          const walletTxs = txs.data.filter(tx => tx.transaction?.data?.sender === walletAddress);
+        const walletTxs = txs.data.filter(tx => tx.transaction?.data?.sender === walletAddress);
 
-          const activitiesData: Activity[] = await Promise.all(
-            walletTxs.map(async (tx, index) => {
-              const txData = tx.transaction?.data;
-              const args = txData?.arguments || [];
-              let walrusUrl: string | undefined = undefined;
-              let certificateName = 'Certificate Issued';
-              let approved: boolean | undefined = undefined;
+        const activitiesData: Activity[] = await Promise.all(
+          walletTxs.map(async (tx, index) => {
+            const txData = tx.transaction?.data;
+            const args = txData?.arguments || [];
+            let walrusUrl: string | undefined = undefined;
+            let certificateName = 'Certificate';
+            let approved: boolean | undefined = undefined;
 
-              if (args.length > 0 && typeof args[0] === 'string') {
-                walrusUrl = args[0];
-              }
+            if (args.length > 0 && typeof args[0] === 'string') {
+              walrusUrl = args[0];
+            }
 
-              const created = tx.effects?.created?.[0]?.reference?.objectId;
-              if (created) {
-                try {
-                  const obj = await suiClient.getObject({
-                    id: created,
-                    options: { showContent: true },
-                  });
-                  const fields = (obj.data?.content as any)?.fields;
-                  if (fields?.description) certificateName = fields.description;
-                  if (typeof fields?.approved === 'boolean') approved = fields.approved;
-                } catch (err) {
-                  console.warn('Failed to fetch created object fields:', err);
+            const created = tx.effects?.created?.[0]?.reference?.objectId;
+            if (created) {
+              try {
+                const obj = await suiClient.getObject({
+                  id: created,
+                  options: { showContent: true },
+                });
+                const fields = (obj.data?.content as any)?.fields;
+                if (fields?.description) {
+                  certificateName = fields.description;
+                } else if (fields?.name) {
+                  certificateName = fields.name;
                 }
+                if (typeof fields?.approved === 'boolean') approved = fields.approved;
+              } catch (err) {
+                console.warn('Failed to fetch created object fields:', err);
               }
+            }
 
-              return {
-                id: index,
-                type: certificateName,
-                timestamp: new Date(Number(tx.timestampMs)).toLocaleString(),
-                link: walrusUrl,
-                transactionId: tx.digest,
-                sender: txData?.sender || '',
-                approved,
-              };
-            })
-          );
+            return {
+              id: index,
+              type: certificateName,
+              timestamp: new Date(Number(tx.timestampMs)).toLocaleString(),
+              link: walrusUrl,
+              transactionId: tx.digest,
+              sender: txData?.sender || '',
+              approved,
+            };
+          })
+        );
 
-          setActivities(activitiesData);
-        }
+        setActivities(activitiesData);
       } catch (error) {
         console.error('Error fetching activities:', error);
       } finally {
@@ -127,7 +104,7 @@ const ActivityHistory: React.FC<{ mode?: 'sender' | 'approver' }> = ({ mode = 's
     };
 
     fetchActivities();
-  }, [walletAddress, mode]);
+  }, [walletAddress]);
 
   const handleActivityClick = (transactionId: string) => {
     const explorerUrl = `https://suiscan.xyz/testnet/tx/${transactionId}`;

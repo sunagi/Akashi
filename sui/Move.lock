@@ -64,6 +64,6 @@ Bridge = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-f
 
 [env.testnet]
 chain-id = "4c78adac"
-original-published-id = "0x57ef8f2cfa12b3f5fcff0c2ac99cd40de3d81038b0758f13f4dde3804e7d7333"
-latest-published-id = "0x57ef8f2cfa12b3f5fcff0c2ac99cd40de3d81038b0758f13f4dde3804e7d7333"
+original-published-id = "0x5f0eb7ec940daaa1096dc1cb18b507c8e01d5bfe9951f57a04178e8fce8b1d01"
+latest-published-id = "0x5f0eb7ec940daaa1096dc1cb18b507c8e01d5bfe9951f57a04178e8fce8b1d01"
 published-version = "1"

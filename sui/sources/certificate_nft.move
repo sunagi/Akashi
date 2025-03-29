@@ -2,11 +2,10 @@ module certificate::certificate_nft {
     use sui::event;
     use std::string;
 
-    /// 認定証明書を表すNFTオブジェクト
+    /// 認定証明書を表すNFTオブジェクト（description を削除済み）
     public struct CertificateNFT has key, store {
-        id: object::UID,                          
-        name: string::String,             
-        description: string::String,      
+        id: object::UID,
+        name: string::String,
         walrus_cid: string::String,
         recipient: address,
         approved: bool,
@@ -14,17 +13,16 @@ module certificate::certificate_nft {
 
     /// 証明書NFT発行イベント
     public struct CertificateIssued has copy, drop {
-        object_id: object::ID,        
-        issuer: address,      
-        name: string::String, 
+        object_id: object::ID,
+        issuer: address,
+        name: string::String,
         walrus_cid: string::String,
     }
 
     /// 証明書NFTを発行する関数
     #[allow(lint(self_transfer))]
     public fun mint_certificate(
-        name: vector<u8>,          
-        description: vector<u8>,   
+        name: vector<u8>,
         walrus_cid: vector<u8>,
         recipient: address,
         ctx: &mut tx_context::TxContext
@@ -34,9 +32,8 @@ module certificate::certificate_nft {
         let nft = CertificateNFT {
             id: object::new(ctx),
             name: string::utf8(name),
-            description: string::utf8(description),
             walrus_cid: string::utf8(walrus_cid),
-            recipient: recipient,
+            recipient,
             approved: false,
         };
 
@@ -47,15 +44,12 @@ module certificate::certificate_nft {
             walrus_cid: nft.walrus_cid,
         });
 
-        transfer::public_transfer(nft, sender);
+        // 受領者に直接送信
+        transfer::public_transfer(nft, recipient);
     }
 
-    const ENotRecipient: u64 = 0;
-
-    /// 承認関数
-    public fun approve_certificate(nft: &mut CertificateNFT, ctx: &mut tx_context::TxContext) {
-        let sender = tx_context::sender(ctx);
-        assert!(sender == nft.recipient, ENotRecipient);
+    /// 証明書承認関数（recipient の所有者だけが呼び出せる）
+    entry fun approve_certificate(nft: &mut CertificateNFT, _ctx: &tx_context::TxContext) {
         nft.approved = true;
     }
 }
