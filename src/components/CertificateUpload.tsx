@@ -46,7 +46,7 @@ const CertificateUpload = () => {
 
   const mintCertificateNFT = async (file: File, walrusCid: string) => {
     if (!currentAccount) throw new Error('Wallet not connected');
-    const PACKAGE_ID = '0x8548a0c6326f25cff9ac6aa123a035201d16f638b6af1d11ba67db823553b20b';
+    const PACKAGE_ID = '0xd0f1a15a1363966b7c19b659171c6f892fac44d6cc63dca67c05f9244362a1e3';
 
     const tx = new TransactionBlock();
     tx.moveCall({
