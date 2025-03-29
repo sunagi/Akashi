@@ -3,7 +3,7 @@ import { CheckCircle } from 'lucide-react';
 import { SuiClient } from '@mysten/sui.js/client';
 import { useWalletKit } from '@mysten/wallet-kit';
 
-const PACKAGE_ID = '0xd0f1a15a1363966b7c19b659171c6f892fac44d6cc63dca67c05f9244362a1e3';
+const PACKAGE_ID = '0x57ef8f2cfa12b3f5fcff0c2ac99cd40de3d81038b0758f13f4dde3804e7d7333';
 const suiClient = new SuiClient({ url: 'https://fullnode.testnet.sui.io' });
 
 export type Activity = {
@@ -13,9 +13,10 @@ export type Activity = {
   link?: string;
   transactionId: string;
   sender: string;
+  approved?: boolean;
 };
 
-const ActivityHistory: React.FC = () => {
+const ActivityHistory: React.FC<{ mode?: 'sender' | 'approver' }> = ({ mode = 'sender' }) => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
   const { currentAccount } = useWalletKit();
@@ -25,35 +26,57 @@ const ActivityHistory: React.FC = () => {
     const fetchActivities = async () => {
       setLoading(true);
       try {
-        // まず、パッケージの関連トランザクションをクエリ
-        const txs = await suiClient.queryTransactionBlocks({
-          filter: {
-            MoveFunction: {
-              package: PACKAGE_ID,
-              module: 'certificate_nft',
-              function: 'mint_certificate',
-            },
-          },
-          options: {
-            showInput: true,
-            showEffects: true,
-            showEvents: true,
-            showObjectChanges: true,
-            showRawInput: true,
-          },
-          limit: 50, // より多くのトランザクションを取得して後でフィルタリング
-        });
+        if (!walletAddress) {
+          setActivities([]);
+          setLoading(false);
+          return;
+        }
 
-        if (walletAddress) {
-          // 接続されたウォレットが送信者のトランザクションのみをフィルタリング
-          const walletTxs = txs.data.filter(tx => {
-            // トランザクションの送信者を取得
-            const sender = tx.transaction?.data?.sender;
-            return sender === walletAddress;
+        if (mode === 'approver') {
+          const { data: owned } = await suiClient.getOwnedObjects({
+            owner: walletAddress,
+            options: { showContent: true },
           });
 
-          console.log(`接続されたウォレット: ${walletAddress}`);
-          console.log(`フィルタリング後のトランザクション数: ${walletTxs.length}`);
+          const ownedNfts = owned
+            .filter(obj => {
+              const typeStr = (obj.data?.content as any)?.type || '';
+              return typeStr.startsWith(`${PACKAGE_ID}::certificate_nft::CertificateNFT`);
+            })
+            .map((obj, index) => {
+              const fields = (obj.data?.content as any)?.fields;
+              return {
+                id: index,
+                type: fields?.name || fields?.description || 'Certificate',
+                timestamp: new Date().toLocaleString(), // No timestamp available
+                link: fields?.walrus_cid,
+                transactionId: obj.data?.objectId,
+                sender: walletAddress,
+                approved: fields?.approved,
+              };
+            });
+
+          setActivities(ownedNfts);
+        } else {
+          const txs = await suiClient.queryTransactionBlocks({
+            filter: {
+              MoveFunction: {
+                package: PACKAGE_ID,
+                module: 'certificate_nft',
+                function: 'mint_certificate',
+              },
+            },
+            options: {
+              showInput: true,
+              showEffects: true,
+              showEvents: true,
+              showObjectChanges: true,
+              showRawInput: true,
+            },
+            limit: 50,
+          });
+
+          const walletTxs = txs.data.filter(tx => tx.transaction?.data?.sender === walletAddress);
 
           const activitiesData: Activity[] = await Promise.all(
             walletTxs.map(async (tx, index) => {
@@ -61,13 +84,12 @@ const ActivityHistory: React.FC = () => {
               const args = txData?.arguments || [];
               let walrusUrl: string | undefined = undefined;
               let certificateName = 'Certificate Issued';
+              let approved: boolean | undefined = undefined;
 
-              // 最初の引数がリンクと仮定
               if (args.length > 0 && typeof args[0] === 'string') {
                 walrusUrl = args[0];
               }
 
-              // Try to get created object name
               const created = tx.effects?.created?.[0]?.reference?.objectId;
               if (created) {
                 try {
@@ -76,11 +98,10 @@ const ActivityHistory: React.FC = () => {
                     options: { showContent: true },
                   });
                   const fields = (obj.data?.content as any)?.fields;
-                  if (fields?.description) {
-                    certificateName = fields.description;
-                  }
+                  if (fields?.description) certificateName = fields.description;
+                  if (typeof fields?.approved === 'boolean') approved = fields.approved;
                 } catch (err) {
-                  console.warn('Failed to fetch created object name:', err);
+                  console.warn('Failed to fetch created object fields:', err);
                 }
               }
 
@@ -91,30 +112,10 @@ const ActivityHistory: React.FC = () => {
                 link: walrusUrl,
                 transactionId: tx.digest,
                 sender: txData?.sender || '',
+                approved,
               };
             })
           );
-
-          setActivities(activitiesData);
-        } else {
-          // ウォレットが接続されていない場合は全ての活動をセット
-          const activitiesData: Activity[] = txs.data.map((tx, index) => {
-            const link = tx.transaction?.data;
-            let walrusUrl: string | undefined = undefined;
-
-            if (typeof link === 'string') {
-              walrusUrl = link;
-            }
-
-            return {
-              id: index,
-              type: 'Certificate Issued',
-              timestamp: new Date(Number(tx.timestampMs)).toLocaleString(),
-              link: walrusUrl,
-              transactionId: tx.digest,
-              sender: tx.transaction?.data?.sender || '',
-            };
-          });
 
           setActivities(activitiesData);
         }
@@ -126,7 +127,7 @@ const ActivityHistory: React.FC = () => {
     };
 
     fetchActivities();
-  }, [walletAddress]);
+  }, [walletAddress, mode]);
 
   const handleActivityClick = (transactionId: string) => {
     const explorerUrl = `https://suiscan.xyz/testnet/tx/${transactionId}`;
@@ -174,9 +175,9 @@ const ActivityHistory: React.FC = () => {
               </a>
             )}
             <p className="text-xs text-white/40 mt-1">{activity.timestamp}</p>
-            {walletAddress && activity.sender === walletAddress && (
-              <p className="text-xs text-emerald-400 mt-1">Your transaction</p>
-            )}
+            <p className={`text-xs mt-1 ${activity.approved ? 'text-emerald-400' : 'text-yellow-400'}`}>
+              Status: {activity.approved ? 'Approved' : 'Pending Approval'}
+            </p>
           </div>
         </div>
       ))}

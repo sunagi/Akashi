@@ -7,8 +7,9 @@ module certificate::certificate_nft {
         id: object::UID,                          
         name: string::String,             
         description: string::String,      
-        /// Walrus CID (分散型ストレージの識別子)
         walrus_cid: string::String,
+        recipient: address,
+        approved: bool,
     }
 
     /// 証明書NFT発行イベント
@@ -16,7 +17,6 @@ module certificate::certificate_nft {
         object_id: object::ID,        
         issuer: address,      
         name: string::String, 
-        /// Walrus CIDを追加
         walrus_cid: string::String,
     }
 
@@ -25,7 +25,8 @@ module certificate::certificate_nft {
     public fun mint_certificate(
         name: vector<u8>,          
         description: vector<u8>,   
-        walrus_cid: vector<u8>,      
+        walrus_cid: vector<u8>,
+        recipient: address,
         ctx: &mut tx_context::TxContext
     ) {
         let sender = tx_context::sender(ctx);
@@ -35,6 +36,8 @@ module certificate::certificate_nft {
             name: string::utf8(name),
             description: string::utf8(description),
             walrus_cid: string::utf8(walrus_cid),
+            recipient: recipient,
+            approved: false,
         };
 
         event::emit(CertificateIssued {
@@ -45,5 +48,14 @@ module certificate::certificate_nft {
         });
 
         transfer::public_transfer(nft, sender);
+    }
+
+    const ENotRecipient: u64 = 0;
+
+    /// 承認関数
+    public fun approve_certificate(nft: &mut CertificateNFT, ctx: &mut tx_context::TxContext) {
+        let sender = tx_context::sender(ctx);
+        assert!(sender == nft.recipient, ENotRecipient);
+        nft.approved = true;
     }
 }

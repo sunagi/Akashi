@@ -7,6 +7,8 @@ const CertificateUpload = () => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [certificateTitle, setCertificateTitle] = useState('');
+  const [certificateDescription, setCertificateDescription] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState('');
   const { currentAccount, signAndExecuteTransactionBlock } = useWalletKit();
 
   const handleDrag = (e: React.DragEvent) => {
@@ -46,17 +48,19 @@ const CertificateUpload = () => {
     return `${aggregatorUrl}/v1/blobs/${blobId}`;
   };
 
-  const mintCertificateNFT = async (file: File, walrusCid: string) => {
+  const mintCertificateNFT = async (file: File, title: string, description: string, walrusCid: string, recipient: string) => {
     if (!currentAccount) throw new Error('Wallet not connected');
-    const PACKAGE_ID = '0xd0f1a15a1363966b7c19b659171c6f892fac44d6cc63dca67c05f9244362a1e3';
+    // モジュールパスが正しいことを確認
+    const PACKAGE_ID = '0x57ef8f2cfa12b3f5fcff0c2ac99cd40de3d81038b0758f13f4dde3804e7d7333';
 
     const tx = new TransactionBlock();
     tx.moveCall({
       target: `${PACKAGE_ID}::certificate_nft::mint_certificate`,
       arguments: [
-        tx.pure(file.name),
-        tx.pure(certificateTitle),
-        tx.pure(walrusCid)
+        tx.pure(title),
+        tx.pure(description),
+        tx.pure(walrusCid),
+        tx.pure(recipient)
       ]
     });
 
@@ -68,13 +72,24 @@ const CertificateUpload = () => {
     if (!selectedFile) return;
     try {
       const walrusCid = await uploadToWalrus(selectedFile);
-      await mintCertificateNFT(selectedFile, walrusCid);
+      
+      // すべての引数を正しく渡す
+      await mintCertificateNFT(
+        selectedFile, 
+        certificateTitle, 
+        certificateDescription, 
+        walrusCid, 
+        recipientAddress
+      );
+      
       alert('Certificate successfully minted as NFT!');
       setSelectedFile(null);
-      setCertificateTitle(''); // Reset the title after upload
+      setCertificateTitle('');
+      setCertificateDescription('');
+      setRecipientAddress('');
     } catch (error) {
-      console.error(error);
-      alert('An error occurred during upload or minting.');
+      console.error('Error details:', error);
+      alert(`An error occurred during upload or minting: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -125,25 +140,53 @@ const CertificateUpload = () => {
       {selectedFile && (
         <div className="mt-4">
           <input
-            type="text"
-            placeholder="Add a title for your certificate"
+            type="id"
+            placeholder="id"
             className="w-full p-2 rounded bg-white/10 text-white placeholder-white/50"
             value={certificateTitle}
             onChange={(e) => setCertificateTitle(e.target.value)}
           />
         </div>
       )}
+      {selectedFile && (
+        <div className="mt-2">
+          <textarea
+            placeholder="Certificate Name"
+            className="w-full p-2 rounded bg-white/10 text-white placeholder-white/50"
+            value={certificateDescription}
+            onChange={(e) => setCertificateDescription(e.target.value)}
+            rows={1}
+          />
+        </div>
+      )}
+      {selectedFile && (
+        <div className="mt-2">
+          <input
+            type="text"
+            placeholder="Approver's address"
+            className="w-full p-2 rounded bg-white/10 text-white placeholder-white/50"
+            value={recipientAddress}
+            onChange={(e) => setRecipientAddress(e.target.value)}
+          />
+        </div>
+      )}
       <div className="mt-4 text-center">
         <button
           className={`py-2 px-4 rounded ${
-            selectedFile && certificateTitle
+            selectedFile &&
+            certificateDescription.trim() !== '' &&
+            recipientAddress.trim() !== ''
               ? 'bg-emerald-500 text-white'
               : 'bg-gray-400 text-white cursor-not-allowed'
           }`}
           onClick={handleFileUpload}
-          disabled={!selectedFile || !certificateTitle}
+          disabled={
+            !selectedFile ||
+            certificateDescription.trim() === '' ||
+            recipientAddress.trim() === ''
+          }
         >
-          Upload Certificate
+          Send Certificate
         </button>
       </div>
     </>

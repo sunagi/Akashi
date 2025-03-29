@@ -24,11 +24,11 @@ function App() {
               <CertificateUpload />
             </section>
 
-            {/* Activity History Section */}
+            {/* Sender Activity Section */}
             <section className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-xl">
               <div className="flex items-center gap-3 mb-6">
                 <History className="w-6 h-6 text-emerald-400" />
-                <h2 className="text-2xl font-semibold text-white">Recent Activity</h2>
+                <h2 className="text-2xl font-semibold text-white">Sender Activity</h2>
               </div>
               <ActivityHistory />
             </section>
